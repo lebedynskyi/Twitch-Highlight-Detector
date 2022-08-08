@@ -3,10 +3,9 @@ import enum
 import logging
 import os
 import subprocess
-import time
 import requests
+import time
 
-TOKEN_URL = "https://id.twitch.tv/oauth2/token?client_id={0}&client_secret={1}&grant_type=client_credentials"
 HELIX_STREAM_URL = "https://api.twitch.tv/helix/streams?user_login={0}"
 
 logger = logging.getLogger(__name__)
@@ -23,7 +22,7 @@ class TwitchStreamerStatus(enum.Enum):
 class TwitchRecorder:
     access_token = None
 
-    def __init__(self, client_id, client_secret, username, output_path, quality="480p", on_download=None):
+    def __init__(self, authenticator, streamer_name, output_path, quality="480p", on_download=None):
         # global configuration
         self.disable_ffmpeg = False
         self.refresh_timeout = 15
@@ -32,21 +31,13 @@ class TwitchRecorder:
         self.on_download = on_download
 
         # twitch configuration
-        self.username = username
+        self.streamer_name = streamer_name
         self.quality = quality
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.token_url = TOKEN_URL.format(self.client_id, self.client_secret)
-
-    def fetch_access_token(self):
-        token_response = requests.post(self.token_url, timeout=15)
-        token_response.raise_for_status()
-        token = token_response.json()
-        return token["access_token"]
+        self.authenticator = authenticator
 
     def run(self):
         # path to recorded stream
-        recording_path = os.path.join(self.output_path, "recorded", self.username)
+        recording_path = os.path.join(self.output_path, "recorded", self.streamer_name)
 
         # create directory for recordedPath and processedPath if not exist
         if os.path.isdir(recording_path) is False:
@@ -58,29 +49,29 @@ class TwitchRecorder:
             self.refresh_timeout = 15
             logger.warning("check interval set to 15 seconds")
 
-        self.access_token = self.fetch_access_token()
         self.loop_check(recording_path)
 
     def loop_check(self, recording_path):
         logger.info("checking for %s every %s seconds, recording with %s quality",
-                    self.username, self.refresh_timeout, self.quality)
+                    self.streamer_name, self.refresh_timeout, self.quality)
         while True:
             status, info = self.check_user()
             if status == TwitchStreamerStatus.NOT_FOUND:
-                logger.error("username not found, invalid username or typo")
+                logger.error("streamer_name not found, invalid streamer_name or typo")
                 time.sleep(self.refresh_timeout)
             elif status == TwitchStreamerStatus.ERROR:
                 logger.error("%s unexpected error. will try again in 5 minutes",
                              datetime.datetime.now().strftime("%Hh%Mm%Ss"))
                 time.sleep(300)
             elif status == TwitchStreamerStatus.OFFLINE:
-                logger.info("%s currently offline, checking again in %s seconds", self.username, self.refresh_timeout)
+                logger.info("%s currently offline, checking again in %s seconds", self.streamer_name,
+                            self.refresh_timeout)
                 time.sleep(self.refresh_timeout)
             elif status == TwitchStreamerStatus.UNAUTHORIZED:
                 logger.info("unauthorized, will attempt to log back in immediately")
-                self.access_token = self.fetch_access_token()
+                self.access_token = self.authenticator.refresh_token()
             elif status == TwitchStreamerStatus.ONLINE:
-                logger.info("%s online, stream recording in session", self.username)
+                logger.info("%s online, stream recording in session", self.streamer_name)
 
                 channels = info["data"]
                 channel = next(iter(channels), None)
@@ -98,8 +89,9 @@ class TwitchRecorder:
         info = None
         status = TwitchStreamerStatus.ERROR
         try:
-            headers = {"Client-ID": self.client_id, "Authorization": "Bearer " + self.access_token}
-            r = requests.get(HELIX_STREAM_URL.format(self.username), headers=headers, timeout=15)
+            headers = {"Client-ID": self.authenticator.client_id,
+                       "Authorization": "Bearer {}".format(self.authenticator.get_token())}
+            r = requests.get(HELIX_STREAM_URL.format(self.streamer_name), headers=headers, timeout=15)
             r.raise_for_status()
             info = r.json()
             if info is None or not info["data"]:
@@ -115,7 +107,7 @@ class TwitchRecorder:
         return status, info
 
     def download_stream(self, channel, recording_path):
-        filename = self.username + " - " + datetime.datetime.now() \
+        filename = self.streamer_name + " - " + datetime.datetime.now() \
             .strftime("%Y-%m-%d %Hh%Mm%Ss") + " - " + channel.get("title") + ".mp4"
 
         filename = "".join(x for x in filename if x.isalnum() or x in [" ", "-", "_", "."])
@@ -125,7 +117,7 @@ class TwitchRecorder:
         subprocess.call([
             "streamlink",
             "--twitch-disable-ads",
-            "twitch.tv/" + self.username,
+            "twitch.tv/" + self.streamer_name,
             self.quality,
             "-o",
             recorded_filename

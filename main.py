@@ -3,7 +3,8 @@ import os
 import sys
 import logging
 
-from stream.downloader import TwitchRecorder
+from clipper.auth import TwitchAuthenticator
+from clipper.recorder import TwitchRecorder
 
 
 def parse_arguments():
@@ -27,7 +28,8 @@ if __name__ == "__main__":
 
     args = parse_arguments()
 
-    rec = TwitchRecorder(args.tw_client, args.tw_secret, args.tw_streamer, args.output_path,
+    authenticator = TwitchAuthenticator(args.tw_client, args.tw_secret)
+    rec = TwitchRecorder(authenticator, args.tw_streamer, args.output_path,
                          args.tw_quality, on_download=on_downloaded)
 
     rec.run()
