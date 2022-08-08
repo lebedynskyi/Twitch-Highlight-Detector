@@ -11,7 +11,7 @@ HELIX_STREAM_URL = "https://api.twitch.tv/helix/streams?user_login={0}"
 logger = logging.getLogger(__name__)
 
 
-class TwitchStreamerStatus(enum.Enum):
+class TwitchStreamStatus(enum.Enum):
     ONLINE = 0
     OFFLINE = 1
     NOT_FOUND = 2
@@ -19,16 +19,16 @@ class TwitchStreamerStatus(enum.Enum):
     ERROR = 4
 
 
-class TwitchRecorder:
+class TwitchVideoRecorder:
     access_token = None
 
-    def __init__(self, authenticator, streamer_name, output_path, quality="480p", on_download=None):
+    def __init__(self, authenticator, streamer_name, output_path, quality="480p", on_finish=None):
         # global configuration
         self.disable_ffmpeg = False
         self.refresh_timeout = 15
         self.output_path = output_path
         self.stream_uid = None
-        self.on_download = on_download
+        self.on_finish = on_finish
 
         # twitch configuration
         self.streamer_name = streamer_name
@@ -56,38 +56,40 @@ class TwitchRecorder:
                     self.streamer_name, self.refresh_timeout, self.quality)
         while True:
             status, info = self.check_user()
-            if status == TwitchStreamerStatus.NOT_FOUND:
+            if status == TwitchStreamStatus.NOT_FOUND:
                 logger.error("streamer_name not found, invalid streamer_name or typo")
                 time.sleep(self.refresh_timeout)
-            elif status == TwitchStreamerStatus.ERROR:
+            elif status == TwitchStreamStatus.ERROR:
                 logger.error("%s unexpected error. will try again in 5 minutes",
                              datetime.datetime.now().strftime("%Hh%Mm%Ss"))
                 time.sleep(300)
-            elif status == TwitchStreamerStatus.OFFLINE:
+            elif status == TwitchStreamStatus.OFFLINE:
                 logger.info("%s currently offline, checking again in %s seconds", self.streamer_name,
                             self.refresh_timeout)
                 time.sleep(self.refresh_timeout)
-            elif status == TwitchStreamerStatus.UNAUTHORIZED:
+            elif status == TwitchStreamStatus.UNAUTHORIZED:
                 logger.info("unauthorized, will attempt to log back in immediately")
                 self.access_token = self.authenticator.refresh_token()
-            elif status == TwitchStreamerStatus.ONLINE:
+            elif status == TwitchStreamStatus.ONLINE:
                 logger.info("%s online, stream recording in session", self.streamer_name)
 
                 channels = info["data"]
                 channel = next(iter(channels), None)
 
-                recorded_filename = self.download_stream(channel, recording_path)
+                recorded_filename = self.record_stream(channel, recording_path)
 
                 logger.info("recording stream is done")
 
-                if self.on_download is not None:
-                    self.on_download(recorded_filename)
+                if self.on_finish is not None:
+                    self.on_finish(channel, recorded_filename)
 
                 time.sleep(self.refresh_timeout)
 
+    # TODO use twitch library instead of pure requests
     def check_user(self):
+
         info = None
-        status = TwitchStreamerStatus.ERROR
+        status = TwitchStreamStatus.ERROR
         try:
             headers = {"Client-ID": self.authenticator.client_id,
                        "Authorization": "Bearer {}".format(self.authenticator.get_token())}
@@ -95,18 +97,18 @@ class TwitchRecorder:
             r.raise_for_status()
             info = r.json()
             if info is None or not info["data"]:
-                status = TwitchStreamerStatus.OFFLINE
+                status = TwitchStreamStatus.OFFLINE
             else:
-                status = TwitchStreamerStatus.ONLINE
+                status = TwitchStreamStatus.ONLINE
         except requests.exceptions.RequestException as e:
             if e.response:
                 if e.response.status_code == 401:
-                    status = TwitchStreamerStatus.UNAUTHORIZED
+                    status = TwitchStreamStatus.UNAUTHORIZED
                 if e.response.status_code == 404:
-                    status = TwitchStreamerStatus.NOT_FOUND
+                    status = TwitchStreamStatus.NOT_FOUND
         return status, info
 
-    def download_stream(self, channel, recording_path):
+    def record_stream(self, channel, recording_path):
         filename = self.streamer_name + " - " + datetime.datetime.now() \
             .strftime("%Y-%m-%d %Hh%Mm%Ss") + " - " + channel.get("title") + ".mp4"
 

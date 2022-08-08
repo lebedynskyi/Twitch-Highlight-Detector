@@ -2,23 +2,30 @@ import argparse
 import os
 import sys
 import logging
+import threading
 
 from clipper.auth import TwitchAuthenticator
-from clipper.recorder import TwitchRecorder
+from clipper.chat import TwitchChatRecorder
+from clipper.video import TwitchVideoRecorder
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Twitch highlighter')
     parser.add_argument('--client', "-c", help='Twitch client id', required=True, dest="tw_client")
     parser.add_argument('--secret', "-s", help='Twitch secret id', required=True, dest="tw_secret")
-    parser.add_argument('--user', "-u", help='Twitch streamer username', required=True, dest="tw_streamer")
+    parser.add_argument('--user', "-u", help='Twitch username id', required=True, dest="tw_username")
+    parser.add_argument('--streamer', "-t", help='Twitch streamer username', required=True, dest="tw_streamer")
     parser.add_argument('--quality', "-q", help='Video downloading quality', dest="tw_quality", default="360p")
     parser.add_argument('--output_path', "-o", help='Video download folder', dest="output_path", default=os.getcwd())
 
     return parser.parse_args()
 
 
-def on_downloaded():
+def on_video_recorded(streamer, filename):
+    pass
+
+
+def on_chat_recorded(streamer, filename):
     pass
 
 
@@ -28,11 +35,19 @@ if __name__ == "__main__":
 
     args = parse_arguments()
 
-    authenticator = TwitchAuthenticator(args.tw_client, args.tw_secret)
-    rec = TwitchRecorder(authenticator, args.tw_streamer, args.output_path,
-                         args.tw_quality, on_download=on_downloaded)
+    authenticator = TwitchAuthenticator(args.tw_client, args.tw_secret, args.tw_username)
 
-    rec.run()
+    video_recorder = TwitchVideoRecorder(authenticator, args.tw_streamer, args.output_path,
+                                         args.tw_quality, on_finish=on_video_recorded)
+
+    chat_recorder = TwitchChatRecorder(authenticator, args.tw_streamer, on_finish=on_chat_recorded)
+
+    # video_thread = threading.Thread(target=video_recorder.run)
+    # video_thread.start()
+
+    chat_thread = threading.Thread(target=chat_recorder.run)
+    chat_thread.start()
+    chat_thread.join()
 
 # Twitch downloader
 # def main(argv):
