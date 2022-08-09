@@ -1,3 +1,4 @@
 requests==2.28.1
 streamlink==4.2.0
-twitch-python==0.0.20
+twitchAPI==2.5.7
+irc==20.1.0
