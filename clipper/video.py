@@ -9,11 +9,11 @@ logger = logging.getLogger(__name__)
 class TwitchVideoRecorder:
     access_token = None
 
-    def __init__(self, authenticator, streamer_name, output_path, quality="480p", on_finish=None):
+    def __init__(self, authenticator, streamer_name, recording_folder, quality="480p", on_finish=None):
         # global configuration
         self.disable_ffmpeg = False
         self.refresh_timeout = 15
-        self.output_path = output_path
+        self.recording_folder = recording_folder
         self.stream_uid = None
         self.on_finish = on_finish
 
@@ -23,13 +23,6 @@ class TwitchVideoRecorder:
         self.authenticator = authenticator
 
     def run(self):
-        # path to recorded stream
-        recording_path = os.path.join(self.output_path, "recorded", self.streamer_name)
-
-        # create directory for recordedPath and processedPath if not exist
-        if os.path.isdir(recording_path) is False:
-            os.makedirs(recording_path)
-
         # make sure the interval to check user availability is not less than 15 seconds
         if self.refresh_timeout < 15:
             logger.warning("check interval should not be lower than 15 seconds")
