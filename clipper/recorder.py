@@ -2,7 +2,6 @@ import logging
 import os
 import time
 import sys
-import threading
 from datetime import datetime
 
 from clipper.api import TwitchApi, TwitchStreamStatus
@@ -22,21 +21,29 @@ class RecorderConfig:
 
 
 class Recorder:
-    audio_thread = None
-    video_thread = None
-
     def __init__(self, config):
         self.config = config
         self.api = TwitchApi(config.tw_client, config.tw_secret)
         self.streamer_folder = os.path.join(self.config.output_folder, self.config.tw_streamer)
         self.video_recorder = TwitchVideoRecorder()
-        self.chat_recorder = TwitchChatRecorder(self.api, debug=True)
+        self.chat_recorder = TwitchChatRecorder(self.api, debug=False)
 
     def run(self):
+        logger.info("Start watching streamer %s", self.config.tw_streamer)
+        status = self.api.get_user_status(self.config.tw_streamer)
+
         while True:
-            logger.info("Start watching streamer %s", self.config.tw_streamer)
-            status = self.api.get_user_status(self.config.tw_streamer)
-            if status == TwitchStreamStatus.ONLINE:
+            if self.video_recorder.is_running or self.chat_recorder.is_running:
+                if not (self.video_recorder.is_running and self.chat_recorder.is_running):
+                    self.video_recorder.stop()
+                    self.chat_recorder.stop()
+                    time.sleep(1)
+                    continue
+
+                logger.info("Recording in progress. Wait 1m")
+                time.sleep(60)
+
+            elif status == TwitchStreamStatus.ONLINE:
                 logger.info("Streamer %s is online. Start recording", self.config.tw_streamer)
 
                 start_time = datetime.now()
@@ -44,16 +51,15 @@ class Recorder:
                 record_folder = os.path.join(self.streamer_folder, record_folder_name)
                 os.makedirs(record_folder)
 
-                chat_file = os.path.join(record_folder,  "chat.txt")
+                chat_file = os.path.join(record_folder, "chat.txt")
                 video_file = os.path.join(record_folder, "video.mp4")
 
                 self.chat_recorder.run(self.config.tw_streamer, chat_file)
-                # self.video_recorder.run(file_template)
+                self.video_recorder.run(self.config.tw_streamer, video_file, quality="160p")
 
-                logger.info("Streamer %s has finished stream", self.config.tw_streamer)
-                time.sleep(15)
+                time.sleep(5)
 
-            if status == TwitchStreamStatus.OFFLINE:
+            elif status == TwitchStreamStatus.OFFLINE:
                 logger.info("Streamer %s is offline. Waiting for 300 sec", self.config.tw_streamer)
                 time.sleep(300)
 
@@ -61,6 +67,6 @@ class Recorder:
                 logger.critical("Error occurred. Exit", self.config.tw_streamer)
                 sys.exit(1)
 
-            if status == TwitchStreamStatus.NOT_FOUND:
+            elif status == TwitchStreamStatus.NOT_FOUND:
                 logger.critical(f"Streamer %s not found, invalid streamer_name or typo", self.config.tw_streamer)
                 sys.exit(1)
