@@ -2,6 +2,7 @@ import logging
 import os
 import time
 import sys
+import threading
 from datetime import datetime
 
 from clipper.api import TwitchApi, TwitchStreamStatus
@@ -27,24 +28,26 @@ class Recorder:
     def __init__(self, config):
         self.config = config
         self.api = TwitchApi(config.tw_client, config.tw_secret)
-        self.recording_folder = os.path.join(self.config.output_folder, self.config.tw_streamer)
-        self.video_recorder = TwitchVideoRecorder(self.api, config.tw_streamer, self.recording_folder)
-        self.chat_recorder = TwitchChatRecorder(self.api, config.tw_streamer, self.recording_folder)
+        self.streamer_folder = os.path.join(self.config.output_folder, self.config.tw_streamer)
+        self.video_recorder = TwitchVideoRecorder()
+        self.chat_recorder = TwitchChatRecorder(self.api, debug=True)
 
     def run(self):
-        if os.path.isdir(self.recording_folder) is False:
-            logger.info("Recording folder `%s` does not exists. Create it", self.recording_folder)
-            os.makedirs(self.recording_folder)
-
         while True:
             logger.info("Start watching streamer %s", self.config.tw_streamer)
             status = self.api.get_user_status(self.config.tw_streamer)
             if status == TwitchStreamStatus.ONLINE:
                 logger.info("Streamer %s is online. Start recording", self.config.tw_streamer)
 
-                now = datetime.now()
-                file_template = "{0}-{1}".format(self.config.tw_streamer, now.strftime("%H-%M-%S"))
-                self.chat_recorder.run(file_template)
+                start_time = datetime.now()
+                record_folder_name = start_time.strftime("%d-%m-%Y_%H-%M-%S")
+                record_folder = os.path.join(self.streamer_folder, record_folder_name)
+                os.makedirs(record_folder)
+
+                chat_file = os.path.join(record_folder,  "chat.txt")
+                video_file = os.path.join(record_folder, "video.mp4")
+
+                self.chat_recorder.run(self.config.tw_streamer, chat_file)
                 # self.video_recorder.run(file_template)
 
                 logger.info("Streamer %s has finished stream", self.config.tw_streamer)

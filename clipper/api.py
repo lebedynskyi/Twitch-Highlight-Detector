@@ -31,7 +31,7 @@ class TwitchApi:
     def get_user_status(self, streamer):
         try:
             streams = self.twitch.get_streams(user_login=streamer)
-            if streams is None or len(streams) < 1:
+            if streams is None or len(streams["data"]) < 1:
                 return TwitchStreamStatus.OFFLINE
             else:
                 return TwitchStreamStatus.ONLINE
@@ -47,7 +47,7 @@ class TwitchApi:
 
     def get_user_chat_channel(self, streamer_name):
         streams = self.twitch.get_streams(user_login=streamer_name)
-        if streams is None or len(streams) < 1:
+        if streams is None or len(streams["data"]) < 1:
             return None
         return streams["data"][0]["user_login"]
 
@@ -66,7 +66,8 @@ class ChatConnection:
         # Need to verify channel name.. case sensitive
         channel = self.api.get_user_chat_channel(self.streamer_name)
         if not channel:
-            logger.error("Cannot find streamer channel")
+            logger.error("Cannot find streamer channel, Offline?")
+            return
 
         self.connect_to_chat(f"#{channel}")
 
@@ -75,13 +76,14 @@ class ChatConnection:
         self.connection.connect((TW_CHAT_SERVER, TW_CHAT_PORT))
         # public data to join hat
         self.connection.send(f"PASS couldBeRandomString\n".encode("utf-8"))
-        self.connection.send(f"NICK justinfan123\n".encode("utf-8"))
+        self.connection.send(f"NICK justinfan113\n".encode("utf-8"))
         self.connection.send(f"JOIN {channel}\n".encode("utf-8"))
+
+        logger.info("Connected to %s", channel)
 
         try:
             while True:
-                msg = self.connection.recv(4096).decode('utf-8')
-                logger.warning(f"Twitch message->  {msg}")
+                msg = self.connection.recv(8192).decode('utf-8')
                 if self.on_message:
                     self.on_message(msg)
         except BaseException as e:
