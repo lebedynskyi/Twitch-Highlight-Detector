@@ -75,15 +75,19 @@ class ChatConnection:
         self.connection = socket.socket()
         self.connection.connect((TW_CHAT_SERVER, TW_CHAT_PORT))
         # public data to join hat
-        self.connection.send(f"PASS couldBeRandomString\n".encode("utf-8"))
-        self.connection.send(f"NICK justinfan113\n".encode("utf-8"))
-        self.connection.send(f"JOIN {channel}\n".encode("utf-8"))
+        self.connection.send(f"PASS couldBeRandomString\r\n".encode("utf-8"))
+        self.connection.send(f"NICK justinfan113\r\n".encode("utf-8"))
+        self.connection.send(f"JOIN {channel}\r\n".encode("utf-8"))
 
         logger.info("Connected to %s", channel)
 
         try:
             while True:
-                msg = self.connection.recv(8192).decode('utf-8')
+                msg = self.connection.recv(1024).decode('utf-8')
+                if "PING :tmi.twitch.tv" in msg:
+                    self.connection.send(bytes("PONG :tmi.twitch.tv\r\n", "UTF-8"))
+                    logger.info("RECEIVED Ping from server. Answered")
+                    continue
                 if self.on_message:
                     self.on_message(msg)
         except BaseException as e:

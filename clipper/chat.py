@@ -8,7 +8,6 @@ CHAT_DIVIDER = "<~|~>"
 
 
 class TwitchChatRecorder:
-    is_running = False
     chat_process = None
 
     def __init__(self, api, debug=False):
@@ -16,9 +15,22 @@ class TwitchChatRecorder:
         self.api = api
 
     def run(self, streamer_name, output_file):
-        self.is_running = True
         self.chat_process = multiprocessing.Process(target=self._record_chat, args=(streamer_name, output_file))
         self.chat_process.start()
+
+    def stop(self):
+        try:
+            if self.chat_process:
+                self.chat_process.terminate()
+
+            self.chat_process = None
+            logger.info("Chat stopped")
+        except BaseException as e:
+            logger.error("Unable to stop chat")
+            logger.error(e)
+
+    def is_running(self):
+        return self.chat_process is not None and self.chat_process.is_alive()
 
     def _record_chat(self, streamer_name, output_file):
         with open(output_file, "w") as stream:
@@ -33,19 +45,6 @@ class TwitchChatRecorder:
                         logger.info("Chat: %s", msg_line)
 
             self.api.start_chat(streamer_name, on_message)
-
-    def stop(self):
-        try:
-            if self.chat_process:
-                self.chat_process.terminate()
-
-            self.chat_process = None
-            logger.error("Chat stopped")
-        except BaseException as e:
-            logger.error("Unable to stop chat")
-            logger.error(e)
-
-        self.is_running = False
 
     def parse_msg(self, msg):
         try:

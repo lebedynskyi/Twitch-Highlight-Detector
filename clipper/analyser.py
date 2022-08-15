@@ -11,6 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 class ChatAnalyser:
+    def __init__(self, ignore_commands=True, ignored_users=["moobot", "nightbot"]):
+        self.ignored_users = ignored_users
+        self.ignore_commands = ignore_commands
+
     def run(self, chat_file, peaks_output_file, peaks_output_chart):
         dates = self._read_message_dates(chat_file)
         messages_per_minute = self._group_dates(dates)
@@ -30,6 +34,12 @@ class ChatAnalyser:
                 message_data = line.split(CHAT_DIVIDER)
                 if len(message_data) != 3:
                     # Wrong line format
+                    continue
+
+                if message_data[1].lower() in self.ignore_commands:
+                    continue
+
+                if self.ignore_commands and message_data[2].startswith("!"):
                     continue
 
                 date = message_data[0]

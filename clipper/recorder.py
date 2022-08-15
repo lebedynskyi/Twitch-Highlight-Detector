@@ -1,6 +1,5 @@
 import logging
 import os
-import subprocess
 import time
 import sys
 from datetime import datetime
@@ -33,9 +32,9 @@ class Recorder:
 
     def run(self):
         logger.info("Start recording streamer %s", self.config.tw_streamer)
-        status = self.api.get_user_status(self.config.tw_streamer)
 
         while True:
+            status = self.api.get_user_status(self.config.tw_streamer)
             if status == TwitchStreamStatus.ONLINE:
                 logger.info("Streamer %s is online. Start recording", self.config.tw_streamer)
 
@@ -59,7 +58,7 @@ class Recorder:
                 time.sleep(300)
 
             if status == TwitchStreamStatus.ERROR:
-                logger.critical("Error occurred. Exit", self.config.tw_streamer)
+                logger.critical("Error occurred %s. Exit", self.config.tw_streamer)
                 sys.exit(1)
 
             elif status == TwitchStreamStatus.NOT_FOUND:
@@ -68,8 +67,8 @@ class Recorder:
 
     def _loop_recording(self):
         while True:
-            if self.video_recorder.is_running or self.chat_recorder.is_running:
-                if not (self.video_recorder.is_running and self.chat_recorder.is_running):
+            if self.video_recorder.is_running() or self.chat_recorder.is_running():
+                if not (self.video_recorder.is_running() and self.chat_recorder.is_running()):
                     self.video_recorder.stop()
                     self.chat_recorder.stop()
                     break
@@ -79,5 +78,6 @@ class Recorder:
             break
 
     def _post_process_video(self, output_chat_file, output_chat_peaks_file, output_chat_chart_file):
+        logger.info("Start looking for peaks in file %s", output_chat_file)
         peaks = self.chat_analyser.run(output_chat_file, output_chat_peaks_file, output_chat_chart_file)
         logger.info("Found peaks: %s for file %s", len(peaks), output_chat_file)

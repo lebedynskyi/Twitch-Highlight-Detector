@@ -5,12 +5,10 @@ logger = logging.getLogger(__name__)
 
 
 class TwitchVideoRecorder:
-    is_running = False
     refresh_timeout = 15
     streamlink_process = None
 
-    def run(self, streamer_name, output_file, quality="720p"):
-        self.is_running = True
+    def run(self, streamer_name, output_file, quality="360p"):
         self._record_stream(streamer_name, output_file, quality)
 
     def stop(self):
@@ -19,12 +17,13 @@ class TwitchVideoRecorder:
                 self.streamlink_process.terminate()
 
             self.streamlink_process = None
-            logger.error("Video stopped")
+            logger.info("Video stopped")
         except BaseException as e:
             logger.error("Unable to stop video")
             logger.error(e)
 
-        self.is_running = False
+    def is_running(self) -> bool:
+        return self.streamlink_process is not None and self.streamlink_process.poll() is None
 
     def _record_stream(self, streamer_name, output_file, quality):
         try:
@@ -40,4 +39,3 @@ class TwitchVideoRecorder:
         except BaseException as e:
             logger.error("Unable to run streamlink")
             logger.error(e)
-            self.is_running = False
