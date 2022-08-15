@@ -4,3 +4,4 @@ twitchAPI==2.5.7
 irc==20.1.0
 scipy==1.9.0
 matplotlib==3.5.2
+numpy==1.23.0

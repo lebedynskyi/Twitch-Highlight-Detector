@@ -15,7 +15,6 @@ class ChatAnalyser:
         dates = self._read_message_dates(chat_file)
         messages_per_minute = self._group_dates(dates)
         peaks = self._find_peeks(messages_per_minute, peaks_output_file, peaks_output_chart)
-        logger.info("Found peaks: %s for file %s", peaks, chat_file)
         return peaks
 
     def _read_message_dates(self, chat_file):
