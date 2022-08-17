@@ -7,6 +7,7 @@ from datetime import datetime
 from clipper.analyser import ChatAnalyser
 from clipper.api import TwitchApi, TwitchStreamStatus
 from clipper.chat import TwitchChatRecorder
+from clipper.clipper import Clipper
 from clipper.video import TwitchVideoRecorder
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ class Recorder:
         self.video_recorder = TwitchVideoRecorder()
         self.chat_recorder = TwitchChatRecorder(self.api, debug=True)
         self.chat_analyser = ChatAnalyser()
+        self.clipper = Clipper()
 
     def run(self):
         logger.info("Start recording streamer %s", self.config.tw_streamer)
@@ -45,13 +47,11 @@ class Recorder:
 
                 output_video_file = os.path.join(record_folder, "video.mp4")
                 output_chat_file = os.path.join(record_folder, "chat.txt")
-                output_chat_peaks_file = os.path.join(record_folder, "chat_peaks.txt")
-                output_chat_chart_file = os.path.join(record_folder, "chat_chart.png")
 
                 self.chat_recorder.run(self.config.tw_streamer, output_chat_file)
                 self.video_recorder.run(self.config.tw_streamer, output_video_file, quality="160p")
                 self._loop_recording()
-                self._post_process_video(output_chat_file, output_chat_peaks_file, output_chat_chart_file)
+                self._post_process_video(record_folder, output_chat_file, output_video_file, start_time)
 
             elif status == TwitchStreamStatus.OFFLINE:
                 logger.info("Streamer %s is offline. Waiting for 300 sec", self.config.tw_streamer)
@@ -77,7 +77,12 @@ class Recorder:
                 continue
             break
 
-    def _post_process_video(self, output_chat_file, output_chat_peaks_file, output_chat_chart_file):
+    def _post_process_video(self, record_folder, output_chat_file, output_video_file, start_time):
+        output_chat_peaks_file = os.path.join(record_folder, "chat_peaks.txt")
+        output_chat_chart_file = os.path.join(record_folder, "chat_chart.png")
+
         logger.info("Start looking for peaks in file %s", output_chat_file)
-        peaks = self.chat_analyser.run(output_chat_file, output_chat_peaks_file, output_chat_chart_file)
+        peaks = self.chat_analyser.run(output_chat_file, output_chat_peaks_file, output_chat_chart_file, start_time)
         logger.info("Found peaks: %s for file %s", len(peaks), output_chat_file)
+
+        self.clipper.run(output_video_file, output_chat_peaks_file, record_folder)
