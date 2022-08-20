@@ -68,6 +68,7 @@ class Clipper:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     args = sys.argv
     if len(args) != 4:
         logger.error("Wrong arguments passed")
