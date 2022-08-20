@@ -83,7 +83,7 @@ class ChatConnection:
 
         try:
             while True:
-                msg = self.connection.recv(1024).decode('utf-8')
+                msg = self.connection.recv(2048).decode('utf-8')
                 if "PING :tmi.twitch.tv" in msg:
                     self.connection.send(bytes("PONG :tmi.twitch.tv\r\n", "UTF-8"))
                     logger.info("RECEIVED Ping from server. Answered")
