@@ -49,12 +49,12 @@ class Clipper:
         try:
             subprocess.call([
                 "ffmpeg",
+                "-i",
+                source_video_file,
                 "-ss",
                 start_time,
                 "-to",
                 end_time,
-                "-i",
-                source_video_file,
                 "-c",
                 "copy",
                 "-err_detect",
