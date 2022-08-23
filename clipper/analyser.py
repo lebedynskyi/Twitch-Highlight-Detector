@@ -83,7 +83,7 @@ class ChatAnalyser:
             start_time = datetime.strptime(x_coordinates[0], "%Y-%m-%d %H:%M")
 
         max_value = max(y_coordinates)
-        trash_hold_value = max_value * 0.75
+        trash_hold_value = max_value * 0.7
         filtered_values = [x_coordinates[index] for index in peak_indices if y_coordinates[index] > trash_hold_value]
         with open(peaks_output_file, "w") as stream:
             for peak in filtered_values:
